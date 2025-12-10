@@ -1,0 +1,9 @@
+screen / wemos
+gnd / gnd
+vcc / 3.3v
+scl / d5
+sda / d7
+res / d0
+dc / d2
+cs / d8
+blk /3.3v
