@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>TeleDraw</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    :root {
+      --bg: #05060b;
+      --bg-elevated: #101321;
+      --bg-elevated-soft: rgba(10, 12, 22, 0.88);
+      --border-soft: rgba(255, 255, 255, 0.06);
+      --border-strong: rgba(255, 255, 255, 0.14);
+      --accent: #5b8cff;
+      --accent-soft: rgba(91, 140, 255, 0.18);
+      --accent-strong: #7fd6ff;
+      --text-main: #f5f7ff;
+      --text-muted: #9ba0b8;
+      --danger: #ff5c7a;
+      --radius-lg: 18px;
+      --radius-pill: 999px;
+      --shadow-soft: 0 18px 45px rgba(0, 0, 0, 0.6);
+      --shadow-inner: inset 0 0 18px rgba(0, 0, 0, 0.8);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;      /* ⬅ stack toolbar, canvas, status vertically */
+      align-items: center;
+      justify-content: center;
+      gap: 10px;                   /* small space between toolbar/canvas/status */
+      padding: 18px;
+      background:
+        radial-gradient(circle at top, #202642 0, #090b12 48%, #05060b 100%);
+      color: var(--text-main);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
+        "Segoe UI", sans-serif;
+    }
+    /* App shell */
+    #canvasWrapper,
+    #toolbar,
+    #status {
+      max-width: 520px;
+      width: 100%;
+    }
+
+    #toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px 12px;
+      padding: 12px 16px;
+      margin-bottom: 0;
+      border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+      background: var(--bg-elevated-soft);
+      border: 1px solid var(--border-soft);
+      border-bottom: none;
+      backdrop-filter: blur(12px);
+      box-shadow: var(--shadow-soft);
+    }
+
+    #toolbar::before {
+      content: "TeleDraw";
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-right: auto;
+      opacity: 0.95;
+    }
+
+    #toolbar > button,
+    #toolbar > label,
+    #toolbar > .brush-group {
+      flex-shrink: 0;
+    }
+
+    /* Buttons */
+    button {
+      padding: 6px 12px;
+      border-radius: var(--radius-pill);
+      border: 1px solid var(--border-soft);
+      background: linear-gradient(135deg, #181a25, #11131c);
+      color: var(--text-main);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition:
+        background 160ms ease,
+        border-color 160ms ease,
+        box-shadow 160ms ease,
+        transform 120ms ease;
+    }
+
+    button:hover {
+      background: linear-gradient(135deg, #222536, #161822);
+      border-color: var(--border-strong);
+      box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.05);
+      transform: translateY(-0.5px);
+    }
+
+    button:active {
+      transform: translateY(0.5px) scale(0.99);
+      box-shadow: none;
+    }
+
+    /* Fill button as accent */
+    #fillBtn {
+      background: radial-gradient(circle at 20% -20%, var(--accent-strong), var(--accent));
+      border-color: rgba(127, 214, 255, 0.6);
+      box-shadow:
+        0 0 0 1px rgba(127, 214, 255, 0.25),
+        0 10px 30px rgba(91, 140, 255, 0.45);
+    }
+
+    #fillBtn:hover {
+      background: radial-gradient(circle at 10% -40%, #a3e3ff, var(--accent));
+    }
+
+    /* Color picker */
+    label {
+      font-size: 12px;
+      color: var(--text-muted);
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 10px;
+      border-radius: var(--radius-pill);
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.04);
+    }
+
+    #colorPicker {
+      width: 32px;
+      height: 24px;
+      padding: 0;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      background: transparent;
+      cursor: pointer;
+      overflow: hidden;
+    }
+
+    #colorPicker::-webkit-color-swatch-wrapper {
+      padding: 0;
+    }
+
+    #colorPicker::-webkit-color-swatch {
+      border: none;
+      border-radius: 6px;
+    }
+
+    /* Brush group */
+    .brush-group {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 8px;
+      border-radius: var(--radius-pill);
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.04);
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .brush-btn {
+      padding: 4px 9px;
+      font-size: 11px;
+      border-radius: var(--radius-pill);
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--text-muted);
+      box-shadow: none;
+    }
+
+    .brush-btn:hover {
+      background: rgba(255, 255, 255, 0.04);
+      border-color: rgba(255, 255, 255, 0.12);
+      color: var(--text-main);
+    }
+
+    .brush-btn.active {
+      background: var(--accent-soft);
+      border-color: rgba(127, 214, 255, 0.7);
+      color: var(--accent-strong);
+      box-shadow: 0 0 0 1px rgba(127, 214, 255, 0.3);
+    }
+
+    /* Canvas card */
+    #canvasWrapper {
+      border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+      background: radial-gradient(circle at top left, #25263f 0, #05060b 55%);
+      border: 1px solid var(--border-soft);
+      border-top: none;
+      box-shadow: var(--shadow-soft);
+      overflow: hidden;
+      position: relative;
+    }
+
+    #canvasWrapper::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      border-radius: inherit;
+      background:
+        radial-gradient(circle at 10% 0%, rgba(127, 214, 255, 0.18), transparent 55%),
+        radial-gradient(circle at 90% 110%, rgba(91, 140, 255, 0.25), transparent 45%);
+      opacity: 0.85;
+      mix-blend-mode: screen;
+    }
+
+    canvas {
+      width: 100%;
+      height: auto;
+      display: block;
+      cursor: crosshair;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+      background: radial-gradient(circle at top, #121420 0, #040508 80%);
+      box-shadow: var(--shadow-inner);
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Status line */
+    #status {
+      margin-top: 10px;
+      max-width: 520px;
+      width: 100%;
+      font-size: 12px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    #status::before {
+      content: "";
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 30% 30%, #9cffc7, #34e48d);
+      box-shadow: 0 0 0 4px rgba(52, 228, 141, 0.18);
+      opacity: 0.75;
+    }
+
+    /* Mobile tweaks */
+    @media (max-width: 600px) {
+      body {
+        padding: 14px;
+      }
+
+      #toolbar {
+        padding: 10px 12px;
+        border-radius: 16px 16px 0 0;
+      }
+
+      #toolbar::before {
+        flex-basis: 100%;
+        margin-bottom: 4px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="toolbar">
+    <button id="fillBtn">Fill</button>
+
+    <label>
+      Color:
+      <input type="color" id="colorPicker" value="#ffffff">
+    </label>
+
+    <div class="brush-group">
+      Brush:
+      <button class="brush-btn active" data-size="2">XS</button>
+      <button class="brush-btn" data-size="4">S</button>
+      <button class="brush-btn" data-size="6">M</button>
+      <button class="brush-btn" data-size="8">L</button>
+      <button class="brush-btn" data-size="10">XL</button>
+    </div>
+  </div>
+
+  <div id="canvasWrapper">
+    <!-- Logical resolution stays 320x240 -->
+    <canvas id="draw" width="320" height="240"></canvas>
+  </div>
+
+  <div id="status">Connecting…</div>
+
+  <script>
+    const canvas = document.getElementById('draw');
+    const ctx = canvas.getContext('2d');
+    const fillBtn = document.getElementById('fillBtn');
+    const colorPicker = document.getElementById('colorPicker');
+    const statusEl = document.getElementById('status');
+    const brushButtons = document.querySelectorAll('.brush-btn');
+
+    let currentColor = '#ffffff';
+    let currentBrushSize = 2; // default matches XS (data-size="2")
+
+    colorPicker.addEventListener('input', (e) => {
+      currentColor = e.target.value; // "#RRGGBB"
+    });
+    brushButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        brushButtons.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentBrushSize = parseInt(btn.dataset.size, 10) || 2;
+      });
+    });
+
+    // Init canvas
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = currentBrushSize;
+
+    let drawing = false;
+    let lastX = 0;
+    let lastY = 0;
+
+    // WebSocket
+    const loc = window.location;
+    const wsProtocol = (loc.protocol === 'https:') ? 'wss:' : 'ws:';
+    const wsUrl = wsProtocol + '//' + loc.host;
+    const ws = new WebSocket(wsUrl);
+
+    ws.addEventListener('open', () => {
+      statusEl.textContent = 'Connected';
+      ws.send(JSON.stringify({ type: 'hello', role: 'browser' }));
+    });
+
+    ws.addEventListener('close', () => {
+      statusEl.textContent = 'Disconnected';
+    });
+
+    ws.addEventListener('error', () => {
+      statusEl.textContent = 'WebSocket error';
+    });
+
+    ws.addEventListener('message', (event) => {
+      let data;
+      try {
+        data = JSON.parse(event.data);
+      } catch (e) {
+        console.error('Invalid JSON from server:', e);
+        return;
+      }
+
+      if (data.type === 'stroke') {
+        const color = data.color || '#ffffff';
+        const width = data.width || 2;
+        drawStroke(data.from[0], data.from[1], data.to[0], data.to[1], color, false, width);
+      } else if (data.type === 'fill') {
+        const color = data.color || '#000000';
+        fillCanvas(color, false);
+      }
+    });
+
+    function fillCanvas(color, send) {
+      ctx.fillStyle = color;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      if (send && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({
+          type: 'fill',
+          color: color
+        }));
+      }
+    }
+
+    function drawStroke(x1, y1, x2, y2, color, send, width) {
+      const w = width || currentBrushSize;
+
+      ctx.strokeStyle = color;
+      ctx.lineWidth = w;
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+
+      if (send && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({
+          type: 'stroke',
+          from: [x1, y1],
+          to: [x2, y2],
+          color: color,
+          width: w
+        }));
+      }
+    }
+
+    function getCanvasCoords(event) {
+      const rect = canvas.getBoundingClientRect();
+      let clientX, clientY;
+
+      if (event.touches && event.touches.length > 0) {
+        clientX = event.touches[0].clientX;
+        clientY = event.touches[0].clientY;
+      } else {
+        clientX = event.clientX;
+        clientY = event.clientY;
+      }
+
+      // Position inside the rendered (CSS) canvas
+      let x = clientX - rect.left;
+      let y = clientY - rect.top;
+
+      // Scale from CSS size to logical canvas size (320x240)
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
+      x = x * scaleX;
+      y = y * scaleY;
+
+      x = Math.max(0, Math.min(canvas.width - 1, Math.round(x)));
+      y = Math.max(0, Math.min(canvas.height - 1, Math.round(y)));
+
+      return { x, y };
+    }
+
+    function startDrawing(event) {
+      event.preventDefault();
+      const pos = getCanvasCoords(event);
+      drawing = true;
+      lastX = pos.x;
+      lastY = pos.y;
+    }
+
+    function stopDrawing(event) {
+      event && event.preventDefault();
+      drawing = false;
+    }
+
+    function moveDrawing(event) {
+      if (!drawing) return;
+      event.preventDefault();
+      const pos = getCanvasCoords(event);
+      drawStroke(lastX, lastY, pos.x, pos.y, currentColor, true);
+      lastX = pos.x;
+      lastY = pos.y;
+    }
+
+    function sendFrameSnapshot() {
+      try {
+        const w = canvas.width;
+        const h = canvas.height;
+        const imgData = ctx.getImageData(0, 0, w, h);
+        const src = imgData.data; // RGBA
+        const pixelCount = w * h;
+
+        // 2 bytes per pixel (RGB565)
+        const buf = new ArrayBuffer(pixelCount * 2);
+        const view = new DataView(buf);
+
+        let si = 0; // source index in RGBA array
+        for (let i = 0; i < pixelCount; i++) {
+          const r = src[si];     // 0–255
+          const g = src[si + 1];
+          const b = src[si + 2];
+          si += 4; // skip alpha
+
+          // Convert to 5-6-5
+          const r5 = r >> 3;
+          const g6 = g >> 2;
+          const b5 = b >> 3;
+          const rgb565 = (r5 << 11) | (g6 << 5) | b5;
+
+          // Store big-endian (hi byte then lo byte)
+          view.setUint16(i * 2, rgb565, false);
+        }
+
+        fetch('/frame.raw', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/octet-stream' },
+          body: buf
+        }).catch(console.error);
+      } catch (e) {
+        console.error('sendFrameSnapshot error', e);
+      }
+    }
+
+    canvas.addEventListener('mousedown', startDrawing);
+    canvas.addEventListener('mousemove', moveDrawing);
+    canvas.addEventListener('mouseup', stopDrawing);
+    canvas.addEventListener('mouseleave', stopDrawing);
+
+    canvas.addEventListener('touchstart', startDrawing, { passive: false });
+    canvas.addEventListener('touchmove', moveDrawing, { passive: false });
+    canvas.addEventListener('touchend', stopDrawing, { passive: false });
+    canvas.addEventListener('touchcancel', stopDrawing, { passive: false });
+
+    fillBtn.addEventListener('click', () => {
+      fillCanvas(currentColor, true);
+    });
+
+    ws.addEventListener('open', () => {
+      statusEl.textContent = 'Connected';
+      ws.send(JSON.stringify({ type: 'hello', role: 'browser' }));
+
+      // Take an initial snapshot shortly after load
+      setTimeout(sendFrameSnapshot, 2000);
+    });
+
+    // Periodic snapshot every minute
+    setInterval(sendFrameSnapshot, 60000);
+
+    
+  </script>
+</body>
+</html>
