@@ -1,4 +1,5 @@
 # TeleDraw
+![20251209_194724(1)](https://github.com/user-attachments/assets/2c8af337-08fd-44a0-9c4d-2b9a59763a26)
 
 **TeleDraw is a tiny always-on shared canvas for long-distance connection.**  
 Two devices, two people, one drawing — synced in real time over the internet.
