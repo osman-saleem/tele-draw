@@ -413,19 +413,29 @@ bool fetchAndDrawFrame() {
 
   if (!http.begin(client, url)) {
     Serial.println("[HTTP] http.begin failed");
-    return false;
+    return false;  // treat as server unreachable
   }
 
   int httpCode = http.GET();
   Serial.printf("[HTTP] GET result code: %d\n", httpCode);
 
+  // Server reachable, but no frame saved yet
+  if (httpCode == HTTP_CODE_NOT_FOUND) {   // 404
+    Serial.println("[HTTP] No frame on server yet (404), skipping draw");
+    http.end();
+    return true;   // SERVER IS OK, just no frame
+  }
+
+  // Any other non-200 is treated as "server problem / unreachable"
   if (httpCode != HTTP_CODE_OK) {
     Serial.printf("[HTTP] GET failed, code=%d\n", httpCode);
     http.end();
     return false;
   }
 
-  WiFiClient* stream = http.getStreamPtr();
+  // --- At this point: HTTP 200 OK, stream the frame ---
+
+  WiFiClient *stream = http.getStreamPtr();
 
   const int width = 320;
   const int height = 240;
@@ -439,12 +449,12 @@ bool fetchAndDrawFrame() {
     for (int x = 0; x < width; x++) {
       uint8_t hi, lo;
 
-      // Wait until at least 2 bytes are available (with timeout)
+      // Wait until we have 2 bytes available (with timeout)
       int waited = 0;
       while (stream->available() < 2) {
         delay(1);
         waited++;
-        if (waited > 2000) { // ~2s per pixel row, very generous
+        if (waited > 2000) {  // ~2s per row
           Serial.println("[HTTP] Timeout waiting for frame data");
           http.end();
           return false;
@@ -461,14 +471,14 @@ bool fetchAndDrawFrame() {
       uint16_t color = (hi << 8) | lo;
       tft.drawPixel(x, y, color);
     }
-    yield(); // let WiFi / watchdog breathe
+    yield();  // let WiFi / watchdog breathe
   }
 
   Serial.printf("[HTTP] Frame drawn, bytesRead=%d (expected %d)\n",
                 bytesRead, expectedBytes);
 
   http.end();
-  return (bytesRead == expectedBytes);
+  return true;
 }
 
 // ---------- SETUP / LOOP ----------
@@ -528,8 +538,11 @@ void setup() {
 
   bool frameOK = fetchAndDrawFrame();
   if (!frameOK) {
-    Serial.println("[BOOT] No frame or failed to draw frame, continuing anyway");
-    tftLog("[HTTP] No frame, skipping");
+    Serial.println("[BOOT] Server unreachable or frame fetch failed, entering AP setup");
+    tftLog("[HTTP] Can't connect to the server");
+    tftLog("[WiFi] AP setup mode");
+    // Now go back to AP portal to re-enter WiFi + server details
+    startConfigPortal();   // never returns
   } 
   setupWS();
 }
